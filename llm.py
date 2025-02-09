@@ -22,10 +22,12 @@ answer_template = (
     "### Instruction:\n"
     "You're a helpful research assistant, who answers questions based on provided research in a clear way and easy-to-understand way.\n"
     "If there is no research, or the research is irrelevant to answering the question, simply reply that you can't answer.\n"
-    "Please reply with just the detailed answer and your sources. If you're unable to answer the question, do not list sources\n\n"
+    "Please reply with just the detailed answer, your sources, and the paper title(s) if applicable.\n\n"
+    "## Paper Title:\n{paper_title}\n\n"
     "## Research:\n{context}\n\n"
     "## Question:\n{question}"
 )
+ANSWER_PROMPT = ChatPromptTemplate.from_template(answer_template)
 ANSWER_PROMPT = ChatPromptTemplate.from_template(answer_template)
 
 DEFAULT_DOCUMENT_PROMPT = PromptTemplate.from_template(
@@ -78,7 +80,7 @@ def getStreamingChain(question: Any, memory: ConversationBufferMemory, llm: Any,
             lambda _: memory.load_memory_variables({})["history"]
         ),
     )
-
+    
     # Pipeline segment for generating a standalone question.
     standalone_question = {
         "standalone_question": {
@@ -88,29 +90,33 @@ def getStreamingChain(question: Any, memory: ConversationBufferMemory, llm: Any,
         | CONDENSE_QUESTION_PROMPT
         | llm  # Process using the LLM
     }
-
+    
     # Pipeline segment for retrieving relevant documents.
     retrieved_documents = {
         "docs": itemgetter("standalone_question") | retriever,
         "question": lambda x: x["standalone_question"],
     }
-
+    
     # Pipeline segment for preparing the final inputs for the answer prompt.
     final_inputs = {
+        # Combine unique paper titles from document metadata 
+        "paper_title": lambda x: ", ".join({
+            doc.metadata.get("paper_title", doc.metadata.get("source", "Unknown"))
+            for doc in x["docs"]
+        }),
         "context": lambda x: _combine_documents(x["docs"]),
         "question": itemgetter("question"),
     }
-
+    
     # Final answer pipeline
     answer_seg = final_inputs | ANSWER_PROMPT | llm
-
+    
     # Compose final chain
     final_chain = loaded_memory | standalone_question | retrieved_documents | answer_seg
-
+    
     try:
         return final_chain.stream({"question": question, "memory": memory})
     except Exception as e:
-        # Log or handle exception as needed.
         raise RuntimeError(f"Error during chain execution: {e}")
 
 def getChatChain(llm: Any, db: Any) -> Callable[[Any], None]:
