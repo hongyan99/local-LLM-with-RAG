@@ -33,27 +33,36 @@ def load_documents_into_database(model_name: str, documents_path: str, persist_d
     """
     Loads documents from the specified directory into the Chroma database
     after splitting the text into chunks, and persists the database to disk.
-
+    
+    This version updates document metadata with the document name, path, and author.
+    
     Args:
         model_name (str): The name of the embedding model.
         documents_path (str): Path to the documents directory.
         persist_directory (Optional[str]): Directory to persist the Chroma database.
-
+    
     Returns:
         ChromaWithProgress: An instance of ChromaWithProgress with loaded documents.
     """
-
+    
     print("Loading documents")
     raw_documents = load_documents(documents_path)
     documents = TEXT_SPLITTER.split_documents(raw_documents)
- 
+    
+    # Update each document's metadata to include document_name, path and author.
+    import os
+    for doc in documents:
+        source = doc.metadata.get("source", "")
+        doc.metadata["document_name"] = os.path.basename(source) if source else "Unknown"
+        doc.metadata["path"] = source if source else "Unknown"
+    
     # Generate IDs for each document using its file path.
     # It is assumed that the file path is stored under the "source" metadata.
     ids = [
         generate_id(f"{doc.metadata.get('source', '')}_{idx}")
         for idx, doc in enumerate(documents)
     ]
-
+    
     print("Creating embeddings and loading documents into Chroma")
     db = ChromaWithProgress.from_documents(
         documents,
