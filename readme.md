@@ -17,6 +17,8 @@ There is also a web UI created using [Streamlit](https://streamlit.io/) to provi
 ## Requirements
 
 - [Ollama](https://ollama.ai/) verson 0.1.26 or higher.
+- [OpenLIT](./openlit_setup.md) server version 1.12.1 or higher.
+
 
 ## Setup
 
