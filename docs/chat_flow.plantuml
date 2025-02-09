@@ -1,0 +1,22 @@
+@startuml
+actor User
+participant "Streamlit UI" as UI
+participant "ui.py" as UI_PY
+participant "LLM Module\n(llm.py)" as LLM
+participant "Conversation Memory" as Memory
+participant "VectorStore/DB" as DB
+
+User -> UI: Enters Question
+UI -> UI_PY: Receive input & button click
+UI_PY -> Memory: Load conversation history
+UI_PY -> DB: Retrieve relevant documents\n(via db.as_retriever)
+DB --> UI_PY: Return relevant docs
+UI_PY -> LLM: Call getChatChain()/getStreamingChain
+note right: Pipeline execution\n(standalone question generation,\nretrieval, and final answer)
+LLM -> Memory: Get chat history & update context
+LLM -> DB: Use retriever to fetch docs
+LLM -> LLM: Generate standalone question\nand prepare answer with context
+LLM --> UI_PY: Return answer and sources
+UI_PY -> Memory: Save question/answer context
+UI_PY -> UI: Display answer to User
+@enduml
