@@ -1,4 +1,5 @@
 from operator import itemgetter
+import re
 from typing import Any, Dict, Callable
 
 from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
@@ -8,7 +9,7 @@ from langchain_core.runnables import RunnableLambda, RunnablePassthrough
 from langchain_core.messages import get_buffer_string
 from langchain.prompts.prompt import PromptTemplate
 
-# Prompt definitions
+# Prompt definitions remain unchanged...
 condense_question = (
     "Given the following conversation and a follow-up question, rephrase the follow-up question to be a standalone question.\n\n"
     "Chat History:\n{chat_history}\n\n"
@@ -43,18 +44,38 @@ memory: ConversationBufferMemory = ConversationBufferMemory(
     return_messages=True, output_key="answer", input_key="question"
 )
 
-def getStreamingChain(question: str, memory: ConversationBufferMemory, llm: Any, db: Any) -> Any:
+def validate_input(question: Any) -> str:
+    """
+    Validates and sanitizes the question input.
+    Returns the sanitized question if valid,
+    or raises a ValueError if the input is invalid.
+    """
+    if not isinstance(question, str):
+        raise ValueError("Question must be a string.")
+    
+    question = question.strip()
+    if not question:
+        raise ValueError("Question cannot be empty.")
+
+    # Optional: remove potentially harmful characters (if necessary)
+    # For example, remove any non-printable characters.
+    question = re.sub(r'[^\x20-\x7E]+', '', question)
+    
+    return question
+
+def getStreamingChain(question: Any, memory: ConversationBufferMemory, llm: Any, db: Any) -> Any:
     """
     Creates and streams the answer chain for a given question.
     """
+    # Validate input question
+    question = validate_input(question)
+    
     retriever = db.as_retriever(search_kwargs={"k": 10})
     
     # Pipeline segment for loading chat history from memory.
     loaded_memory = RunnablePassthrough.assign(
         chat_history=RunnableLambda(
-            lambda x: "\n".join(
-                [f"{item['role']}: {item['content']}" for item in x["memory"]]
-            )
+            lambda _: memory.load_memory_variables({})["history"]
         ),
     )
 
@@ -62,7 +83,7 @@ def getStreamingChain(question: str, memory: ConversationBufferMemory, llm: Any,
     standalone_question = {
         "standalone_question": {
             "question": lambda x: x["question"],
-            "chat_history": lambda x: x["chat_history"],
+            "chat_history": lambda x: x.get("chat_history", ""),
         }
         | CONDENSE_QUESTION_PROMPT
         | llm  # Process using the LLM
@@ -89,10 +110,10 @@ def getStreamingChain(question: str, memory: ConversationBufferMemory, llm: Any,
     try:
         return final_chain.stream({"question": question, "memory": memory})
     except Exception as e:
-        # Log or handle exception as needed
+        # Log or handle exception as needed.
         raise RuntimeError(f"Error during chain execution: {e}")
 
-def getChatChain(llm: Any, db: Any) -> Callable[[str], None]:
+def getChatChain(llm: Any, db: Any) -> Callable[[Any], None]:
     """
     Creates a chat chain that processes a question and updates conversation memory.
     """
@@ -129,7 +150,12 @@ def getChatChain(llm: Any, db: Any) -> Callable[[str], None]:
 
     final_chain = loaded_memory | standalone_question | retrieved_documents | answer_seg
 
-    def chat(question: str) -> None:
+    def chat(raw_question: Any) -> None:
+        try:
+            question = validate_input(raw_question)
+        except ValueError as ve:
+            raise RuntimeError(f"Invalid input: {ve}")
+
         inputs = {"question": question}
         try:
             result = final_chain.invoke(inputs)
