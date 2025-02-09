@@ -6,9 +6,10 @@ from langchain_community.document_loaders import (
 import os
 from typing import List
 from langchain_core.documents import Document
-from langchain_community.embeddings import OllamaEmbeddings
+from langchain_ollama.embeddings import OllamaEmbeddings
 from langchain_community.vectorstores import Chroma
 from langchain.text_splitter import RecursiveCharacterTextSplitter
+from tqdm import tqdm  # Added for per-file progress
 
 TEXT_SPLITTER = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
 
@@ -74,5 +75,7 @@ def load_documents(path: str) -> List[Document]:
     docs = []
     for file_type, loader in loaders.items():
         print(f"Loading {file_type} files")
-        docs.extend(loader.load())
+        loaded_files = loader.load()
+        for doc in tqdm(loaded_files, desc=f"Processing {file_type} files", unit="file"):
+            docs.append(doc)
     return docs
