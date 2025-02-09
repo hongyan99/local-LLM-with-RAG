@@ -25,9 +25,8 @@ Follow the instruction at: https://docs.docker.com/desktop/setup/install/windows
 
 ## Register With OpenLIT in Application
 
-Note that the instruction in openlit site suggested to use https://127.0.0.1:4318 but that does not work.
-Going to docker, http://localhost:4318 is listed as the URL. It seems that extra effort is needed to
-configure the https endpoint.
+Note that the instruction in openlit site suggested to use https://127.0.0.1:4318 but if you have not yet
+setup https for your docker instance, you cannot use the https. Just use http instead.
 
 ## View Logs
 
