@@ -8,6 +8,10 @@ from models import get_list_of_models
 
 from llm import getStreamingChain
 
+import openlit
+
+
+openlit.init(otlp_endpoint='http://localhost:4318', trace_content=True)
 
 EMBEDDING_MODEL = "nomic-embed-text"
 PATH = "Research"

@@ -7,3 +7,4 @@ ollama==0.4.7
 tqdm==4.67.1
 streamlit==1.42.0
 watchdog==6.0.0
+openlit==1.33.8
