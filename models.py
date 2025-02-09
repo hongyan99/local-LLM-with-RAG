@@ -39,7 +39,9 @@ def get_list_of_models() -> list[str]:
     Returns:
         list[str]: A list of model names available in the Ollama repository.
     """
-    return [model["name"] for model in ollama.list()["models"]]
+    list_of_models = ollama.list()
+    print(list_of_models)
+    return [model["model"] for model in list_of_models["models"]]
 
 
 def check_if_model_is_available(model_name: str) -> None:
