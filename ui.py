@@ -1,7 +1,7 @@
 import streamlit as st
 import os
 
-from langchain_community.llms import Ollama
+from langchain_ollama import OllamaLLM
 from document_loader import load_documents_into_database
 
 from models import get_list_of_models
@@ -24,7 +24,7 @@ selected_model = st.sidebar.selectbox(
 
 if st.session_state.get("ollama_model") != selected_model:
     st.session_state["ollama_model"] = selected_model
-    st.session_state["llm"] = Ollama(model=selected_model)
+    st.session_state["llm"] = OllamaLLM(model=selected_model)
 
 
 # Folder selection
