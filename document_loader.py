@@ -4,33 +4,62 @@ from langchain_community.document_loaders import (
     TextLoader,
 )
 import os
-from typing import List
+import hashlib
+from typing import List, Optional
 from langchain_core.documents import Document
 from langchain_ollama.embeddings import OllamaEmbeddings
-from langchain_community.vectorstores import Chroma
+from chroma_with_progress import ChromaWithProgress
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from tqdm import tqdm  # Added for per-file progress
+
 
 TEXT_SPLITTER = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
 
 
-def load_documents_into_database(model_name: str, documents_path: str) -> Chroma:
+def generate_id(file_path: str) -> str:
+    """
+    Generates an idempotent ID based on the file path using SHA-256.
+    
+    Args:
+        file_path (str): The file path to generate an ID for.
+    
+    Returns:
+        str: A SHA-256 hash hex digest of the file path.
+    """
+    return hashlib.sha256(file_path.encode("utf-8")).hexdigest()
+
+
+def load_documents_into_database(model_name: str, documents_path: str, persist_directory: Optional[str] = "chroma_db") -> ChromaWithProgress:
     """
     Loads documents from the specified directory into the Chroma database
-    after splitting the text into chunks.
+    after splitting the text into chunks, and persists the database to disk.
+
+    Args:
+        model_name (str): The name of the embedding model.
+        documents_path (str): Path to the documents directory.
+        persist_directory (Optional[str]): Directory to persist the Chroma database.
 
     Returns:
-        Chroma: The Chroma database with loaded documents.
+        ChromaWithProgress: An instance of ChromaWithProgress with loaded documents.
     """
 
     print("Loading documents")
     raw_documents = load_documents(documents_path)
     documents = TEXT_SPLITTER.split_documents(raw_documents)
+ 
+    # Generate IDs for each document using its file path.
+    # It is assumed that the file path is stored under the "source" metadata.
+    ids = [
+        generate_id(f"{doc.metadata.get('source', '')}_{idx}")
+        for idx, doc in enumerate(documents)
+    ]
 
     print("Creating embeddings and loading documents into Chroma")
-    db = Chroma.from_documents(
+    db = ChromaWithProgress.from_documents(
         documents,
         OllamaEmbeddings(model=model_name),
+        ids=ids,
+        persist_directory=persist_directory,
     )
     return db
 
@@ -39,10 +68,8 @@ def load_documents(path: str) -> List[Document]:
     """
     Loads documents from the specified directory path.
 
-    This function supports loading of PDF, Markdown, and HTML documents by utilizing
-    different loaders for each file type. It checks if the provided path exists and
-    raises a FileNotFoundError if it does not. It then iterates over the supported
-    file types and uses the corresponding loader to load the documents into a list.
+    This function supports loading of PDF and Markdown documents by utilizing
+    different loaders for each file type.
 
     Args:
         path (str): The path to the directory containing documents to load.
